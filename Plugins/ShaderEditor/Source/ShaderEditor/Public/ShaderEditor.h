@@ -22,6 +22,7 @@ private:
 
 	FString GetShaderContent(FString shaderFilename);
 	FString GetListOfAllShaders();
+	FString GetShaderPath(FString shaderFilename);
 
 	TArray<FString> GetAllFilesInDirectory(const FString directory, const bool fullPath, const FString onlyFilesWithExtension);
 
@@ -30,17 +31,14 @@ private:
 
 	TSharedRef<class SDockTab> OnSpawnPluginTab(const class FSpawnTabArgs& SpawnTabArgs);
 
-	FReply CopyCodeViewTextToClipboard();
-
 private:
+
 	TSharedPtr<class FUICommandList> m_PluginCommands;
+	TSharedPtr<SWidget> m_viewUtility;
+	TSharedPtr<class SScrollBox> m_view;
+	TSharedPtr<SMultiLineEditableTextBox> m_multiLineTextbox;
+	//TSharedPtr<SListView<TSharedPtr<SButton>>> m_listView;
 
-	TSharedPtr<SWidget> m_CodeViewUtility;
-
-	TSharedPtr<class SScrollBox> m_CodeView;
-	FString m_code;
-
-	TSharedPtr<SMultiLineEditableTextBox> m_textbox;
-
-	TWeakPtr<SDockTab> m_CodeTab;
+	FString m_textboxContent;
+	FString m_pathToCurrentShader;
 };

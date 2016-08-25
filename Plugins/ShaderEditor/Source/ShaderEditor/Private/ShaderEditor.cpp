@@ -10,6 +10,9 @@
 
 #include "LevelEditor.h"
 
+#include "Utils.h"
+#include "ShaderCompiler.h"
+
 static const FName ShaderEditorTabName("ShaderEditor");
 
 #define LOCTEXT_NAMESPACE "FShaderEditorModule"
@@ -66,95 +69,113 @@ void FShaderEditorModule::ShutdownModule()
 
 TSharedRef<SDockTab> FShaderEditorModule::OnSpawnPluginTab(const FSpawnTabArgs& SpawnTabArgs)
 {
-	//FString list = GetListOfAllShaders();
-	FString list = GetShaderContent(TEXT("common.usf"));
+	m_textboxContent = GetListOfAllShaders();
 
-	m_code = list;
+	m_multiLineTextbox = SNew(SMultiLineEditableTextBox);
+	m_multiLineTextbox->SetText(FText::FromString(m_textboxContent));
 
-	m_CodeViewUtility = SNew(SVerticalBox)
-		+ SVerticalBox::Slot()
-		.AutoHeight()
-		[
-			SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot()
-		.AutoWidth()
-		.Padding(2.0f, 0.0f)
-		.VAlign(VAlign_Center)
-		.HAlign(HAlign_Left)
-		[
-			SNew(SButton)
-			.Text(LOCTEXT("Copy", "Copy"))
-		.ToolTipText(LOCTEXT("CopyToolTip", "Copies all the code to the clipboard"))
-		.ContentPadding(3)
-		//.OnClicked(this,&FTestPluginModule::CopyCodeViewTextToClipboard)
-		.OnClicked_Lambda([&]()
-	{
-		FPlatformMisc::ClipboardCopy(*m_code);
-		return FReply::Handled();
-	})
-		]
-		]
-	// Separator
-	+ SVerticalBox::Slot()
-		.FillHeight(1)
-		[
-			SNew(SSeparator)
-		];
-
-	m_textbox = SNew(SMultiLineEditableTextBox);
-	m_textbox->SetText(FText::FromString(list));
-
-	TAttribute<FSlateColor> yellow = FSlateColor(FLinearColor(1.0, 1.0, 0.0));
-	TAttribute<FSlateColor> green = FSlateColor(FLinearColor(0.0, 1.0, 0.0));
-	TAttribute<FSlateColor> white = FSlateColor(FLinearColor(1.0, 1.0, 1.0));
-	TAttribute<FSlateColor> black = FSlateColor(FLinearColor(0.0, 0.0, 0.0));
-
-	m_textbox->SetForegroundColor(yellow);
-
-	m_textbox->SetTextBoxBackgroundColor(black);
-
-	m_CodeView = SNew(SScrollBox);
-	auto& slot = m_CodeView->AddSlot();
-	slot.SlotPadding = 5;
-	slot.AttachWidget(m_textbox.ToSharedRef());
-
-	//does the same as above
-	/*m_CodeView = SNew(SScrollBox)
-	+ SScrollBox::Slot().Padding(5)
-	[
-	m_textbox.ToSharedRef()
-	];*/
+	m_multiLineTextbox->SetForegroundColor(Utils::Black);
+	m_multiLineTextbox->SetTextBoxBackgroundColor(Utils::White);
 
 
-	//[] - attaches widget to slot
-	//+ - adds slot
+	m_viewUtility = SNew(SVerticalBox)
+					+ SVerticalBox::Slot()
+					.AutoHeight()
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot()
+						.AutoWidth()
+						.Padding(2.0f, 0.0f)
+						.VAlign(VAlign_Center)
+						.HAlign(HAlign_Left)
+						[
+							SNew(SButton)
+							.Text(LOCTEXT("List", "List all shaders"))
+							.ToolTipText(LOCTEXT("ListToolTip", "Shows list of all shaders in Unreal"))
+							.ContentPadding(3)
+							.OnClicked_Lambda([&]()
+							{
+								m_textboxContent = GetListOfAllShaders();
+								m_multiLineTextbox->SetText(FText::FromString(m_textboxContent));
+								return FReply::Handled();
+							})
+						]
+						+ SHorizontalBox::Slot()
+						.AutoWidth()
+						.Padding(2.0f, 0.0f)
+						.VAlign(VAlign_Center)
+						.HAlign(HAlign_Left)
+						[
+							SNew(SButton)
+							.Text(LOCTEXT("Edit", "Edit shader"))
+							.ToolTipText(LOCTEXT("EditToolTip", "Edit Shader"))
+							.ContentPadding(3)
+							.OnClicked_Lambda([&]()
+							{
+								m_pathToCurrentShader = GetShaderPath(TEXT("BRDF.usf"));
+
+								m_textboxContent = GetShaderContent(TEXT("BRDF.usf"));
+								m_multiLineTextbox->SetText(FText::FromString(m_textboxContent));
+								return FReply::Handled();
+							})
+						]
+						+ SHorizontalBox::Slot()
+							.AutoWidth()
+							.Padding(2.0f, 0.0f)
+							.VAlign(VAlign_Center)
+							.HAlign(HAlign_Left)
+							[
+								SNew(SButton)
+								.Text(LOCTEXT("Save", "Save shader"))
+								.ToolTipText(LOCTEXT("SaveShaderToolTip", "Save shader"))
+								.ContentPadding(3)
+								.OnClicked_Lambda([&]()
+								{
+									m_textboxContent = m_multiLineTextbox->GetText().ToString();
+									FFileHelper::SaveStringToFile(m_textboxContent, *m_pathToCurrentShader);
+									
+									GUnrealEd->Exec(GUnrealEd->GetWorld(), TEXT("RECOMPILESHADERS CHANGED"));
+									return FReply::Handled();
+								})
+							]
+					];
+
+
+	//TArray<TSharedPtr<SButton>> buttons;
+	//TSharedPtr<SButton> button = SNew(SButton)
+	//	.Text(LOCTEXT("omg", "omg"));
+	//
+	//buttons.Add(button);
+
+	//m_listView = SNew(SListView<TSharedPtr<SButton>>)
+	//	.ListItemsSource(&buttons);
+	//	.OnGenerateRow_Lambda([&]() {return FReply::Handled();});
+
+	m_view = SNew(SScrollBox)
+			+ SScrollBox::Slot().Padding(5)
+			[
+				m_multiLineTextbox.ToSharedRef()
+				//m_listView.ToSharedRef()
+			];
+
+
 	TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab)
-		.Label(LOCTEXT("ShaderCodeTitle", "Shader code"))
-		[
-			SNew(SVerticalBox)
-			+ SVerticalBox::Slot()
-		.AutoHeight()
-		[
-			m_CodeViewUtility.ToSharedRef()
-		]
-	+ SVerticalBox::Slot()
-		.FillHeight(1)
-		[
-			m_CodeView.ToSharedRef()
-		]
-		];
-
-	m_CodeTab = SpawnedTab;
+									.Label(LOCTEXT("ShaderCodeTitle", "Shader code"))
+									[
+										SNew(SVerticalBox)
+										+ SVerticalBox::Slot()
+										.AutoHeight()
+										[
+											m_viewUtility.ToSharedRef()
+										]
+										+ SVerticalBox::Slot()
+										.FillHeight(1)
+										[
+											m_view.ToSharedRef()
+										]
+									];
 
 	return SpawnedTab;
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-FReply FShaderEditorModule::CopyCodeViewTextToClipboard()
-{
-	FPlatformMisc::ClipboardCopy(*m_code);
-	return FReply::Handled();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -166,6 +187,13 @@ FString FShaderEditorModule::GetShaderContent(FString shaderFilename)
 	FString FileData = "";
 	FFileHelper::LoadFileToString(FileData, *CompleteFilePath);
 	return  FileData;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+FString FShaderEditorModule::GetShaderPath(FString shaderFilename)
+{
+	return FPaths::EngineDir() + "Shaders/" + shaderFilename;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
