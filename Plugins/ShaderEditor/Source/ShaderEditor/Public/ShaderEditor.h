@@ -4,8 +4,12 @@
 
 #include "ModuleManager.h"
 
+///////////////////////////////////////////////////////////////////////////////////
+
 class FToolBarBuilder;
 class FMenuBuilder;
+
+///////////////////////////////////////////////////////////////////////////////////
 
 class FShaderEditorModule : public IModuleInterface
 {
@@ -20,7 +24,7 @@ public:
 	
 private:
 
-	FString GetShaderContent(FString shaderFilename);
+	FString GetShaderContent(FString shaderPath);
 	FString GetListOfAllShaders();
 	FString GetShaderPath(FString shaderFilename);
 
@@ -35,10 +39,11 @@ private:
 
 	TSharedPtr<class FUICommandList> m_PluginCommands;
 	TSharedPtr<SWidget> m_viewUtility;
-	TSharedPtr<class SScrollBox> m_view;
+	TSharedPtr<SScrollBox> m_view;
 	TSharedPtr<SMultiLineEditableTextBox> m_multiLineTextbox;
-	//TSharedPtr<SListView<TSharedPtr<SButton>>> m_listView;
 
 	FString m_textboxContent;
 	FString m_pathToCurrentShader;
 };
+
+///////////////////////////////////////////////////////////////////////////////////

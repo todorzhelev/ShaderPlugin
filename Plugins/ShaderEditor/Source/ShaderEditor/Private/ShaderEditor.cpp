@@ -13,9 +13,14 @@
 #include "Utils.h"
 #include "ShaderCompiler.h"
 
+#include "Editor/MainFrame/Public/Interfaces/IMainFrameModule.h"
+#include "Developer/DesktopPlatform/Public/DesktopPlatformModule.h"
+
 static const FName ShaderEditorTabName("ShaderEditor");
 
 #define LOCTEXT_NAMESPACE "FShaderEditorModule"
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void FShaderEditorModule::StartupModule()
 {
@@ -67,6 +72,8 @@ void FShaderEditorModule::ShutdownModule()
 	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(ShaderEditorTabName);
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 TSharedRef<SDockTab> FShaderEditorModule::OnSpawnPluginTab(const FSpawnTabArgs& SpawnTabArgs)
 {
 	m_textboxContent = GetListOfAllShaders();
@@ -112,10 +119,42 @@ TSharedRef<SDockTab> FShaderEditorModule::OnSpawnPluginTab(const FSpawnTabArgs& 
 							.ContentPadding(3)
 							.OnClicked_Lambda([&]()
 							{
-								m_pathToCurrentShader = GetShaderPath(TEXT("BRDF.usf"));
+								FString path = FPaths::EngineDir() + "Shaders/";
 
-								m_textboxContent = GetShaderContent(TEXT("BRDF.usf"));
-								m_multiLineTextbox->SetText(FText::FromString(m_textboxContent));
+								TArray<FString> OpenFilenames;
+								IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+								bool bOpened = false;
+								if (DesktopPlatform)
+								{
+									void* ParentWindowWindowHandle = NULL;
+
+									IMainFrameModule& MainFrameModule = FModuleManager::LoadModuleChecked<IMainFrameModule>(TEXT("MainFrame"));
+									const TSharedPtr<SWindow>& MainFrameParentWindow = MainFrameModule.GetParentWindow();
+									if (MainFrameParentWindow.IsValid() && MainFrameParentWindow->GetNativeWindow().IsValid())
+									{
+										ParentWindowWindowHandle = MainFrameParentWindow->GetNativeWindow()->GetOSWindowHandle();
+									}
+
+									bOpened = DesktopPlatform->OpenFileDialog(
+										ParentWindowWindowHandle,
+										LOCTEXT("ImportDialogTitle", "Import").ToString(),
+										path,
+										TEXT(""),
+										TEXT("USF Files (*.usf)|*.usf"),
+										EFileDialogFlags::None,
+										OpenFilenames
+										);
+								}
+
+								if (bOpened)
+								{
+									m_pathToCurrentShader = OpenFilenames[0];
+									
+									m_textboxContent = GetShaderContent(OpenFilenames[0]);
+									m_multiLineTextbox->SetText(FText::FromString(m_textboxContent));
+								}
+
+								
 								return FReply::Handled();
 							})
 						]
@@ -134,6 +173,21 @@ TSharedRef<SDockTab> FShaderEditorModule::OnSpawnPluginTab(const FSpawnTabArgs& 
 									m_textboxContent = m_multiLineTextbox->GetText().ToString();
 									FFileHelper::SaveStringToFile(m_textboxContent, *m_pathToCurrentShader);
 									
+									return FReply::Handled();
+								})
+							]
+						+ SHorizontalBox::Slot()
+							.AutoWidth()
+							.Padding(2.0f, 0.0f)
+							.VAlign(VAlign_Center)
+							.HAlign(HAlign_Left)
+							[
+								SNew(SButton)
+								.Text(LOCTEXT("Recompile", "Recompile shaders"))
+								.ToolTipText(LOCTEXT("RecompileTooltip", "Recompile changed shaders"))
+								.ContentPadding(3)
+								.OnClicked_Lambda([&]()
+								{
 									GUnrealEd->Exec(GUnrealEd->GetWorld(), TEXT("RECOMPILESHADERS CHANGED"));
 									return FReply::Handled();
 								})
@@ -141,21 +195,10 @@ TSharedRef<SDockTab> FShaderEditorModule::OnSpawnPluginTab(const FSpawnTabArgs& 
 					];
 
 
-	//TArray<TSharedPtr<SButton>> buttons;
-	//TSharedPtr<SButton> button = SNew(SButton)
-	//	.Text(LOCTEXT("omg", "omg"));
-	//
-	//buttons.Add(button);
-
-	//m_listView = SNew(SListView<TSharedPtr<SButton>>)
-	//	.ListItemsSource(&buttons);
-	//	.OnGenerateRow_Lambda([&]() {return FReply::Handled();});
-
 	m_view = SNew(SScrollBox)
 			+ SScrollBox::Slot().Padding(5)
 			[
 				m_multiLineTextbox.ToSharedRef()
-				//m_listView.ToSharedRef()
 			];
 
 
@@ -180,12 +223,10 @@ TSharedRef<SDockTab> FShaderEditorModule::OnSpawnPluginTab(const FSpawnTabArgs& 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-FString FShaderEditorModule::GetShaderContent(FString shaderFilename)
+FString FShaderEditorModule::GetShaderContent(FString shaderPath)
 {
-	FString CompleteFilePath = FPaths::EngineDir() + "Shaders/" + shaderFilename;
-
 	FString FileData = "";
-	FFileHelper::LoadFileToString(FileData, *CompleteFilePath);
+	FFileHelper::LoadFileToString(FileData, *shaderPath);
 	return  FileData;
 }
 
@@ -249,20 +290,28 @@ TArray<FString> FShaderEditorModule::GetAllFilesInDirectory(const FString direct
 	return files;
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void FShaderEditorModule::PluginButtonClicked()
 {
 	FGlobalTabmanager::Get()->InvokeTab(ShaderEditorTabName);
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void FShaderEditorModule::AddMenuExtension(FMenuBuilder& Builder)
 {
 	Builder.AddMenuEntry(FShaderEditorCommands::Get().OpenPluginWindow);
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void FShaderEditorModule::AddToolbarExtension(FToolBarBuilder& Builder)
 {
 	Builder.AddToolBarButton(FShaderEditorCommands::Get().OpenPluginWindow);
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #undef LOCTEXT_NAMESPACE
 	
